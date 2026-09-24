@@ -1,0 +1,24 @@
+{
+  "name": "uts-kelompok_6-digital_watermarking",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking/issues"
+  },
+  "homepage": "https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking#readme"
+}
