@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking/issues"
   },
-  "homepage": "https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking#readme"
+  "homepage": "https://github.com/DzikKun/UTS-Kelompok_6-Digital_Watermarking#readme",
+  "devDependencies": {
+    "jpeg-js": "^0.4.4"
+  }
 }
