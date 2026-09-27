@@ -25,30 +25,6 @@ Fitur pengayaan:
 - Simulasi serangan: kompresi JPEG (kualitas 90/70/50), resize, cropping, derau Gaussian, kecerahan/kontras
 - Tab perbandingan Fragile vs Robust pada citra dan serangan yang sama
 
-## Struktur Proyek
-
-```
-watermark-app/
-  src/
-    prng.js       PRNG berkunci dan pembangkit stego-key (CSPRNG)
-    lsb.js        Penyisipan dan ekstraksi watermark fragile (LSB)
-    dct.js        Penyisipan dan ekstraksi watermark robust (DCT)
-    metrics.js    Perhitungan PSNR, NC, BER, histogram
-    attacks.js    Simulasi serangan citra
-    ui.js         Wiring antarmuka (upload, canvas, tampilan hasil)
-  test/
-    prng.test.js
-    lsb.test.js
-    metrics.test.js
-    attacks.test.js
-    dct.test.js
-  data-uji/       Citra uji dan hasil serangan
-  laporan/        Laporan teknis
-  index.html
-  package.json
-  README.md
-```
-
 ## Teknologi
 
 - JavaScript (ES Modules), HTML5, CSS3 — seluruhnya client-side, tanpa backend
