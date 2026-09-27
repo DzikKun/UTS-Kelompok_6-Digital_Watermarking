@@ -3,6 +3,138 @@
 (function () {
 "use strict";
 
+/* ===== src/prng.js ===== */
+function generateSecretKey(byteLength = 16) {
+  if (typeof crypto === "undefined" || !crypto.getRandomValues) {
+    throw new Error(
+      "Web Crypto API tidak tersedia di environment ini. " +
+      "Jalankan di browser modern atau Node.js >= 19."
+    );
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function xmur3(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function () {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  };
+}
+
+function mulberry32(seed) {
+  let a = seed | 0;
+  return function () {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function keyedPermutation(key, n) {
+  const rng = mulberry32(xmur3(key)());
+  const arr = new Uint32Array(n);
+  for (let i = 0; i < n; i++) arr[i] = i;
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+/* ===== src/lsb.js ===== */
+function textToBits(str) {
+  const bytes = new TextEncoder().encode(str);
+  const bits = [];
+  for (const byte of bytes) {
+    for (let i = 7; i >= 0; i--) bits.push((byte >> i) & 1);
+  }
+  return bits;
+}
+
+function bitsToText(bits) {
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    let b = 0;
+    for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+    bytes.push(b);
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+  } catch {
+    return "[gagal decode sbg UTF-8] " + bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
+  }
+}
+
+function embedLSB(cover, payloadBits, key) {
+  if (!payloadBits.length) throw new Error("payloadBits kosong");
+  const { width, height } = cover;
+  const n = width * height;
+  const perm = keyedPermutation(key + "|" + payloadBits.length, n);
+
+  const stegoData = new Uint8ClampedArray(cover.data);
+
+  for (let i = 0; i < n; i++) {
+    const pixelIndex = perm[i];
+    const channelOffset = pixelIndex * 4 + 2;
+    const bit = payloadBits[i % payloadBits.length];
+    stegoData[channelOffset] = (stegoData[channelOffset] & 0xfe) | bit;
+  }
+
+  return { data: stegoData, width, height };
+}
+
+function extractLSB(current, expectedBits, key) {
+  if (!expectedBits.length) throw new Error("expectedBits kosong");
+  const { width, height } = current;
+  const n = width * height;
+  const perm = keyedPermutation(key + "|" + expectedBits.length, n);
+
+  const tamperData = new Uint8ClampedArray(n * 4);
+  let mismatchCount = 0;
+  let dot = 0;
+
+  for (let i = 0; i < n; i++) {
+    const pixelIndex = perm[i];
+    const channelOffset = pixelIndex * 4 + 2;
+    const extractedBit = current.data[channelOffset] & 1;
+    const expectedBit = expectedBits[i % expectedBits.length];
+    const match = extractedBit === expectedBit;
+
+    if (!match) mismatchCount++;
+
+    const tp = pixelIndex * 4;
+    if (match) {
+      tamperData[tp] = 240; tamperData[tp + 1] = 240; tamperData[tp + 2] = 240; tamperData[tp + 3] = 255;
+    } else {
+      tamperData[tp] = 220; tamperData[tp + 1] = 38; tamperData[tp + 2] = 38; tamperData[tp + 3] = 255;
+    }
+
+    const a = extractedBit ? 1 : -1;
+    const b = expectedBit ? 1 : -1;
+    dot += a * b;
+  }
+
+  return {
+    ber: (mismatchCount / n) * 100,
+    nc: dot / n,
+    mismatchCount,
+    totalBits: n,
+    tamperMap: { data: tamperData, width, height },
+  };
+}
+
 /* ===== src/dct.js ===== */
 // src/dct.js
 // Modul Robust Watermarking berbasis DCT 2D blok 8×8, blind extraction.

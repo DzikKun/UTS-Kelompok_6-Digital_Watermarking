@@ -26,12 +26,36 @@ pada citra dan skenario serangan yang sama.
 
 ## Cara Instalasi & Menjalankan
 
-Tidak perlu instalasi apa pun.
+Ada dua cara, tergantung kebutuhan:
 
-1. Unduh/`clone` folder proyek ini.
-2. Buka file `index.html` langsung di browser modern (Chrome/Edge/Firefox
-   terbaru).
-3. Selesai — semua pemrosesan terjadi lokal di browser Anda.
+### Untuk dipakai/dinilai langsung — buka `dist/index.html` (double-click, tanpa server)
+
+Ini cara yang direkomendasikan untuk submit/demo. Folder `dist/` berisi hasil
+build yang sudah digabung jadi satu `bundle.js` (bukan ES Module lagi), jadi
+bisa langsung dibuka dengan **double-click** tanpa server lokal dan tanpa
+error CORS.
+
+```bash
+node build.js
+```
+
+lalu buka `dist/index.html` langsung di browser mana pun. Jalankan ulang
+`node build.js` setiap kali ada perubahan di `src/`, karena isi `dist/` adalah
+hasil generate otomatis (jangan diedit manual).
+
+### Untuk pengembangan — jalankan `src/` lewat server lokal
+
+Source code di `src/` tetap ditulis sebagai ES Modules (`<script
+type="module">`) supaya konsisten dengan kontrak antar-modul dan bisa dites
+dengan `node --test`. Browser modern (Chrome/Edge) memblokir ES Module yang
+dimuat langsung dari `file://`, jadi saat mengembangkan/`index.html` di root
+folder, buka lewat server lokal:
+
+```bash
+python -m http.server 8000
+```
+lalu buka `http://localhost:8000`, **atau** pakai ekstensi **Live Server** di
+VS Code (klik kanan `index.html` → Open with Live Server).
 
 > Untuk menjalankan unit test (Node.js, tanpa dependency tambahan):
 > ```bash
