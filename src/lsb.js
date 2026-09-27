@@ -1,4 +1,5 @@
 import { keyedPermutation } from "./prng.js";
+import { normalizedCorrelation, bitErrorRate } from "./metrics.js";
 
 export function textToBits(str) {
   const bytes = new TextEncoder().encode(str);
@@ -49,7 +50,8 @@ export function extractLSB(current, expectedBits, key) {
 
   const tamperData = new Uint8ClampedArray(n * 4);
   let mismatchCount = 0;
-  let dot = 0;
+  const extracted = new Array(n);
+  const expected = new Array(n);
 
   for (let i = 0; i < n; i++) {
     const pixelIndex = perm[i];
@@ -59,6 +61,8 @@ export function extractLSB(current, expectedBits, key) {
     const match = extractedBit === expectedBit;
 
     if (!match) mismatchCount++;
+    extracted[i] = extractedBit;
+    expected[i] = expectedBit;
 
     const tp = pixelIndex * 4;
     if (match) {
@@ -66,15 +70,11 @@ export function extractLSB(current, expectedBits, key) {
     } else {
       tamperData[tp] = 220; tamperData[tp + 1] = 38; tamperData[tp + 2] = 38; tamperData[tp + 3] = 255;
     }
-
-    const a = extractedBit ? 1 : -1;
-    const b = expectedBit ? 1 : -1;
-    dot += a * b;
   }
 
   return {
-    ber: (mismatchCount / n) * 100,
-    nc: dot / n,
+    ber: bitErrorRate(extracted, expected),
+    nc: normalizedCorrelation(extracted, expected),
     mismatchCount,
     totalBits: n,
     tamperMap: { data: tamperData, width, height },
