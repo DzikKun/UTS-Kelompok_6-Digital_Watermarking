@@ -225,7 +225,7 @@
 <body>
 
 <header>
-  <h1>Digital Watermarking — Fragile (LSB) &amp; Robust (DCT)</h1>
+  <h1>Digital Watermarking (Kelompok 6 Kelas G) — Fragile (LSB) &amp; Robust (DCT)</h1>
   <p>Aplikasi berjalan sepenuhnya di browser. Tidak ada gambar atau kunci yang dikirim ke server mana pun.</p>
 </header>
 
@@ -277,6 +277,10 @@
         <option value="crop">Cropping</option>
       </select>
     </div>
+    <div class="field">
+      <label for="lsb-attack-param" id="lsb-attack-param-label">Parameter</label>
+      <input type="text" id="lsb-attack-param" value="70" />
+    </div>
     <button class="action secondary" id="lsb-attack-run" disabled>Terapkan serangan</button>
   </section>
 
@@ -318,7 +322,7 @@
 
     <div class="field">
       <label for="dct-delta">Kekuatan sisipan (delta)</label>
-      <input type="text" id="dct-delta" value="12" />
+      <input type="text" id="dct-delta" value="25" />
     </div>
 
     <div class="field" style="margin-top:14px;">
@@ -341,6 +345,10 @@
         <option value="resize">Resize (downscale–upscale)</option>
         <option value="crop">Cropping</option>
       </select>
+    </div>
+    <div class="field">
+      <label for="dct-attack-param" id="dct-attack-param-label">Parameter</label>
+      <input type="text" id="dct-attack-param" value="70" />
     </div>
     <button class="action secondary" id="dct-attack-run" disabled>Terapkan serangan</button>
   </section>
@@ -368,7 +376,7 @@
       Jalankan embed + serangan yang sama pada kedua tab sebelumnya, lalu tekan tombol
       di bawah untuk menyusun perbandingan.
     </p>
-    <button class="action" id="compare-run" disabled>Susun Tabel Perbandingan</button>
+    <button class="action" id="compare-run">Susun Tabel Perbandingan</button>
     <button class="action secondary" id="compare-export" disabled>Unduh hasil uji (.xlsx)</button>
   </section>
 
