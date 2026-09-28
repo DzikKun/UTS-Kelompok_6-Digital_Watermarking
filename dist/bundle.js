@@ -1,9 +1,6 @@
-// Auto-generated oleh build.js — JANGAN diedit manual.
-// Sumber asli ada di src/*.js (ES Module).
 (function () {
 "use strict";
 
-/* ===== src/prng.js ===== */
 function generateSecretKey(byteLength = 16) {
   if (typeof crypto === "undefined" || !crypto.getRandomValues) {
     throw new Error(
@@ -53,7 +50,6 @@ function keyedPermutation(key, n) {
   return arr;
 }
 
-/* ===== src/lsb.js ===== */
 function textToBits(str) {
   const bytes = new TextEncoder().encode(str);
   const bits = [];
@@ -103,7 +99,8 @@ function extractLSB(current, expectedBits, key) {
 
   const tamperData = new Uint8ClampedArray(n * 4);
   let mismatchCount = 0;
-  let dot = 0;
+  const extracted = new Array(n);
+  const expected = new Array(n);
 
   for (let i = 0; i < n; i++) {
     const pixelIndex = perm[i];
@@ -113,6 +110,8 @@ function extractLSB(current, expectedBits, key) {
     const match = extractedBit === expectedBit;
 
     if (!match) mismatchCount++;
+    extracted[i] = extractedBit;
+    expected[i] = expectedBit;
 
     const tp = pixelIndex * 4;
     if (match) {
@@ -120,56 +119,19 @@ function extractLSB(current, expectedBits, key) {
     } else {
       tamperData[tp] = 220; tamperData[tp + 1] = 38; tamperData[tp + 2] = 38; tamperData[tp + 3] = 255;
     }
-
-    const a = extractedBit ? 1 : -1;
-    const b = expectedBit ? 1 : -1;
-    dot += a * b;
   }
 
   return {
-    ber: (mismatchCount / n) * 100,
-    nc: dot / n,
+    ber: bitErrorRate(extracted, expected),
+    nc: normalizedCorrelation(extracted, expected),
     mismatchCount,
     totalBits: n,
     tamperMap: { data: tamperData, width, height },
   };
 }
 
-/* ===== src/dct.js ===== */
-// src/dct.js
-// Modul Robust Watermarking berbasis DCT 2D blok 8x8, blind extraction.
-// Environment-agnostic — TIDAK mengimpor document/canvas/window.
-//
-// Ringkasan teknik:
-//   1. RGB -> YCbCr, watermark hanya disisip di kanal Y (luminansi).
-//   2. Kanal Y dibagi blok blockWidth x blockHeight (standar 8x8).
-//   3. Urutan blok yang dipakai = keyedPermutation(key + '|' + panjangPayload, totalBlok)
-//      dari prng.js — deterministik terhadap key, konsisten dengan pola lsb.js.
-//   4. Payload bit diulang ke SELURUH blok yang tersedia (payloadBits[i % panjang]),
-//      sama seperti pola redundansi di lsb.js — supaya ekstraksi bisa majority-vote
-//      per posisi bit asli, menaikkan ketahanan terhadap serangan.
-//   5. Tiap blok: DCT 2D, lalu bandingkan koefisien frekuensi-menengah di posisi
-//      (row=3,col=4) vs (row=4,col=3). Bit 1 -> coef(3,4) dibuat lebih besar
-//      dari coef(4,3) sebesar `delta`; bit 0 -> sebaliknya. Perubahan dilakukan
-//      simetris di sekitar rata-rata kedua koefisien supaya energi blok (dan
-//      distorsi visual) minimal.
-//   6. Inverse DCT 2D, gabung lagi ke YCbCr asli (Cb/Cr tidak disentuh) -> RGB.
-//   7. Ekstraksi: DCT ulang tiap blok pada citra saat ini (current), baca relasi
-//      koefisien (tanpa butuh citra cover asli -> blind), lalu majority-vote per
-//      posisi bit asli dari seluruh pengulangannya.
-//   8. NC & BER final dihitung lewat normalizedCorrelation()/bitErrorRate() dari
-//      metrics.js — TIDAK dihitung ulang manual di sini.
-
-
-
-
-// Posisi koefisien frekuensi-menengah yang dipakai untuk menyisip 1 bit per blok.
-const POS_A = [1, 2]; // [row, col]
+const POS_A = [1, 2];
 const POS_B = [2, 1];
-
-/* ------------------------------------------------------------------ */
-/* Konversi ruang warna RGB <-> YCbCr (ITU-R BT.601)                    */
-/* ------------------------------------------------------------------ */
 
 function rgbToY(r, g, b) {
   return 0.299 * r + 0.587 * g + 0.114 * b;
@@ -190,10 +152,6 @@ function clamp255(v) {
   return v < 0 ? 0 : v > 255 ? 255 : v;
 }
 
-/* ------------------------------------------------------------------ */
-/* DCT 2D ortonormal (separable: transform 1D di lebar, lalu di tinggi) */
-/* ------------------------------------------------------------------ */
-
 const cosTableCache = new Map();
 
 function getCosTable(N) {
@@ -213,7 +171,6 @@ function alpha(u, N) {
   return u === 0 ? Math.sqrt(1 / N) : Math.sqrt(2 / N);
 }
 
-/** DCT-II 1D ortonormal: vec (spasial, panjang N) -> koefisien (panjang N). */
 function dct1d(vec) {
   const N = vec.length;
   const table = getCosTable(N);
@@ -226,7 +183,6 @@ function dct1d(vec) {
   return out;
 }
 
-/** Invers eksak dari dct1d (DCT-III ortonormal). */
 function idct1d(vec) {
   const N = vec.length;
   const table = getCosTable(N);
@@ -239,19 +195,17 @@ function idct1d(vec) {
   return out;
 }
 
-/** DCT 2D pada blok persegi panjang (array baris x kolom). */
 function dct2d(block) {
   const h = block.length, w = block[0].length;
-  const rows = block.map((row) => dct1d(row)); // transform sepanjang lebar
+  const rows = block.map((row) => dct1d(row));
   const cols = [];
   for (let c = 0; c < w; c++) cols.push(rows.map((row) => row[c]));
-  const colsDct = cols.map((col) => dct1d(col)); // transform sepanjang tinggi
+  const colsDct = cols.map((col) => dct1d(col));
   const out = [];
   for (let r = 0; r < h; r++) out.push(colsDct.map((col) => col[r]));
-  return out; // out[row_freq][col_freq]
+  return out;
 }
 
-/** Invers dct2d — urutan transform dibalik (tinggi dulu, baru lebar). */
 function idct2d(coef) {
   const h = coef.length, w = coef[0].length;
   const cols = [];
@@ -261,11 +215,6 @@ function idct2d(coef) {
   for (let r = 0; r < h; r++) rows.push(colsIdct.map((col) => col[r]));
   return rows.map((row) => idct1d(row));
 }
-
-/* ------------------------------------------------------------------ */
-/* Util lokal: bits -> text (duplikasi kecil dari lsb.js supaya dct.js */
-/* tetap tidak bergantung pada modul lain selain prng.js & metrics.js) */
-/* ------------------------------------------------------------------ */
 
 function bitsToTextLocal(bits) {
   const bytes = [];
@@ -281,10 +230,6 @@ function bitsToTextLocal(bits) {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* API publik sesuai kontrak                                           */
-/* ------------------------------------------------------------------ */
-
 function validateBlockSize(blockWidth, blockHeight) {
   if (blockWidth <= POS_A[1] || blockHeight <= POS_B[0]) {
     throw new RangeError(
@@ -293,16 +238,6 @@ function validateBlockSize(blockWidth, blockHeight) {
   }
 }
 
-/**
- * Sisipkan payloadBits ke citra cover memakai DCT 2D blok pada kanal Y.
- * @param {{data: Uint8ClampedArray, width: number, height: number}} cover
- * @param {number} blockWidth  - lebar blok, standar 8
- * @param {number} blockHeight - tinggi blok, standar 8
- * @param {number[]} payloadBits - array bit (0/1)
- * @param {string} key - stego-key
- * @param {number} delta - margin/kekuatan sisipan antar koefisien
- * @returns {{data: Uint8ClampedArray, width: number, height: number}} citra stego
- */
 function embedDCT(cover, blockWidth, blockHeight, payloadBits, key, delta) {
   if (cover.width % blockWidth !== 0 || cover.height % blockHeight !== 0) {
     throw new Error("Lebar dan tinggi citra harus kelipatan ukuran blok (mis. 8).");
@@ -380,16 +315,6 @@ function embedDCT(cover, blockWidth, blockHeight, payloadBits, key, delta) {
   return { data: stegoData, width, height };
 }
 
-/**
- * Ekstrak payload dari citra (blind — tidak butuh citra cover asli).
- * @param {{data: Uint8ClampedArray, width: number, height: number}} current
- * @param {number} blockWidth
- * @param {number} blockHeight
- * @param {number[]} expectedBits - dipakai untuk hitung NC/BER & majority-vote
- * @param {string} key
- * @returns {{nc: number, berFinal: number, rawBer: number, recovered: number[],
- *            recoveredText: string, blockMap: {data:Uint8ClampedArray,width:number,height:number}}}
- */
 function extractDCT(current, blockWidth, blockHeight, expectedBits, key) {
   if (!expectedBits.length) throw new Error("expectedBits kosong");
   if (current.width % blockWidth !== 0 || current.height % blockHeight !== 0) {
@@ -479,7 +404,6 @@ function extractDCT(current, blockWidth, blockHeight, expectedBits, key) {
   };
 }
 
-/* ===== src/metrics.js ===== */
 function psnr(imageA, imageB) {
   if (imageA.width !== imageB.width || imageA.height !== imageB.height) {
     throw new RangeError('Ukuran citra harus sama untuk menghitung PSNR');
@@ -534,7 +458,6 @@ function channelHistogram(image) {
   return { r, g, b };
 }
 
-/* ===== src/attacks.js ===== */
 function clone(image) {
   return { data: new Uint8ClampedArray(image.data), width: image.width, height: image.height };
 }
@@ -609,12 +532,12 @@ function attackCrop(image, cropPercent) {
   return resample({ data: cropped, width: cw, height: ch }, image.width, image.height);
 }
 
-/* ===== src/ui.js ===== */
 function canvasToPlainImage(canvas) {
   const ctx = canvas.getContext("2d");
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   return { data: imgData.data, width: canvas.width, height: canvas.height };
 }
+
 
 function drawPlainImageToCanvas(plainImage, canvas) {
   canvas.width = plainImage.width;
@@ -627,6 +550,7 @@ function drawPlainImageToCanvas(plainImage, canvas) {
   );
   ctx.putImageData(imgData, 0, 0);
 }
+
 
 function loadFileToCanvas(file, canvas) {
   return new Promise((resolve, reject) => {
@@ -651,6 +575,7 @@ function setResult(el, html) {
 function fmtMetric(label, value, unit = "") {
   return `<span class="metric">${label}: ${value}${unit}</span>`;
 }
+
 
 function attackJPEGBrowser(image, quality) {
   return new Promise((resolve, reject) => {
@@ -679,6 +604,7 @@ function attackJPEGBrowser(image, quality) {
   });
 }
 
+
 const ATTACK_PARAM_DEFAULTS = {
   none: { label: "Parameter (tidak dipakai)", value: "" },
   jpeg: { label: "Kualitas JPEG (1-100)", value: "70" },
@@ -687,6 +613,7 @@ const ATTACK_PARAM_DEFAULTS = {
   resize: { label: "Skala (0-1, mis. 0.5 = setengah)", value: "0.5" },
   crop: { label: "Persentase crop tepi (0-99)", value: "10" },
 };
+
 
 async function applyAttackByType(type, image, paramValue) {
   switch (type) {
@@ -707,15 +634,21 @@ async function applyAttackByType(type, image, paramValue) {
   }
 }
 
+
 function wireAttackParamDefaults(selectEl, paramEl, labelEl) {
   selectEl.addEventListener("change", () => {
     const def = ATTACK_PARAM_DEFAULTS[selectEl.value] || { label: "Parameter", value: "" };
     labelEl.textContent = def.label;
     paramEl.value = def.value;
   });
+  
   const initial = ATTACK_PARAM_DEFAULTS[selectEl.value] || { label: "Parameter", value: "" };
   labelEl.textContent = initial.label;
 }
+
+
+
+
 
 const tabButtons = document.querySelectorAll("nav.tabs button[data-tab]");
 const panels = document.querySelectorAll("main[data-panel]");
@@ -730,6 +663,10 @@ tabButtons.forEach((btn) => {
   });
 });
 
+
+
+
+
 const lsbCoverInput = document.getElementById("lsb-cover");
 const lsbCanvasCover = document.getElementById("lsb-canvas-cover");
 const lsbCanvasStego = document.getElementById("lsb-canvas-stego");
@@ -741,7 +678,7 @@ const lsbExtractBtn = document.getElementById("lsb-extract");
 const lsbAttackRunBtn = document.getElementById("lsb-attack-run");
 const lsbResultsEl = document.getElementById("lsb-results");
 
-let lsbCoverImage = null;
+let lsbCoverImage = null; 
 
 lsbCoverInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -824,6 +761,8 @@ lsbAttackRunBtn.addEventListener("click", async () => {
   }
   try {
     lsbAttackRunBtn.disabled = true;
+    
+    
     const attacked = await applyAttackByType(type, lsbCoverImage.__lastStego, paramValue);
     drawPlainImageToCanvas(attacked, lsbCanvasStego);
     setResult(
@@ -837,6 +776,10 @@ lsbAttackRunBtn.addEventListener("click", async () => {
     lsbAttackRunBtn.disabled = false;
   }
 });
+
+
+
+
 
 const dctCoverInput = document.getElementById("dct-cover");
 const dctCanvasCover = document.getElementById("dct-canvas-cover");
@@ -885,7 +828,7 @@ dctEmbedBtn.addEventListener("click", () => {
     return;
   }
   try {
-    const payloadBits = textToBits(dctPayloadEl.value);
+    const payloadBits = textToBits(dctPayloadEl.value); 
     const stego = embedDCT(dctCoverImage, 8, 8, payloadBits, key, delta);
     drawPlainImageToCanvas(stego, dctCanvasStego);
     dctCoverImage.__lastStego = stego;
@@ -963,15 +906,15 @@ dctAttackRunBtn.addEventListener("click", async () => {
   }
 });
 
-/* ------------------------------------------------------------------ */
-/* Tab: Bandingkan                                                      */
-/* ------------------------------------------------------------------ */
+
+
+
 
 const compareRunBtn = document.getElementById("compare-run");
 const compareExportBtn = document.getElementById("compare-export");
 const compareTableBody = document.getElementById("compare-table-body");
 
-let lastCompareRows = null;
+let lastCompareRows = null; 
 
 function formatPsnr(value) {
   if (value === undefined || value === null) return "-";
@@ -1016,6 +959,10 @@ compareRunBtn.addEventListener("click", () => {
   lastCompareRows = rows;
   compareExportBtn.disabled = false;
 });
+
+
+
+
 
 function xlsxTextEncode(str) {
   return new TextEncoder().encode(str);

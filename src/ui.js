@@ -3,7 +3,6 @@ import { textToBits, bitsToText, embedLSB, extractLSB } from "./lsb.js";
 import { embedDCT, extractDCT } from "./dct.js";
 import { attackBrightness, attackGaussianNoise, attackResize, attackCrop } from "./attacks.js";
 import { psnr } from "./metrics.js";
-
 function canvasToPlainImage(canvas) {
   const ctx = canvas.getContext("2d");
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -135,7 +134,7 @@ const lsbExtractBtn = document.getElementById("lsb-extract");
 const lsbAttackRunBtn = document.getElementById("lsb-attack-run");
 const lsbResultsEl = document.getElementById("lsb-results");
 
-let lsbCoverImage = null;
+let lsbCoverImage = null; // {data,width,height}
 
 lsbCoverInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -218,6 +217,7 @@ lsbAttackRunBtn.addEventListener("click", async () => {
   }
   try {
     lsbAttackRunBtn.disabled = true;
+
     const attacked = await applyAttackByType(type, lsbCoverImage.__lastStego, paramValue);
     drawPlainImageToCanvas(attacked, lsbCanvasStego);
     setResult(
@@ -279,7 +279,7 @@ dctEmbedBtn.addEventListener("click", () => {
     return;
   }
   try {
-    const payloadBits = textToBits(dctPayloadEl.value);
+    const payloadBits = textToBits(dctPayloadEl.value); // reuse util dari lsb.js
     const stego = embedDCT(dctCoverImage, 8, 8, payloadBits, key, delta);
     drawPlainImageToCanvas(stego, dctCanvasStego);
     dctCoverImage.__lastStego = stego;
@@ -357,15 +357,11 @@ dctAttackRunBtn.addEventListener("click", async () => {
   }
 });
 
-/* ------------------------------------------------------------------ */
-/* Tab: Bandingkan                                                      */
-/* ------------------------------------------------------------------ */
-
 const compareRunBtn = document.getElementById("compare-run");
 const compareExportBtn = document.getElementById("compare-export");
 const compareTableBody = document.getElementById("compare-table-body");
 
-let lastCompareRows = null;
+let lastCompareRows = null; // dipakai juga oleh tombol export
 
 function formatPsnr(value) {
   if (value === undefined || value === null) return "-";
