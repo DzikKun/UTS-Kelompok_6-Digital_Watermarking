@@ -23,8 +23,6 @@ function stripModuleSyntax(code) {
   out = out.replace(/^([ \t]*)export\s+(function|const|let|var|class|async function)\b/gm, "$1$2");
   out = out.replace(/^([ \t]*)export\s+default\s+/gm, "$1");
   out = out.replace(/^[ \t]*export\s*\{[^}]*\}\s*;?[ \t]*$/gm, "");
-  out = out.replace(/\/\/.*$/gm, "");
-  out = out.replace(/\/\*[\s\S]*?\*\//g, "");
   return `\n${out.trim()}\n`;
 }
 
